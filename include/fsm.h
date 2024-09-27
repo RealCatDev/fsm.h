@@ -37,11 +37,13 @@ bool fsm_initialized(fsm_t fsm) {
 }
 
 void fsm_init(fsm_t *fsm, size_t event_count) {
+  assert(fsm);
   if (fsm->event_count != 0) return; // Already initialized
   fsm->event_count = event_count;
 }
 
 fsm_state_t fsm_push_empty(fsm_t *fsm) {
+  assert(fsm);
   if (fsm->count >= fsm->capacity) {
     if (fsm->capacity == 0) fsm->capacity = 16;
     else fsm->capacity *= 2;
@@ -53,12 +55,15 @@ fsm_state_t fsm_push_empty(fsm_t *fsm) {
 }
 
 void fsm_set(fsm_t *fsm, fsm_state_t column, fsm_event_t row, fsm_state_t state) {
+  assert(fsm);
   assert(column <= fsm->count);
   assert(row <= fsm->event_count);
   fsm->items[column][row] = state;
 }
 
 fsm_state_t fsm_get(fsm_t fsm, fsm_state_t column, fsm_event_t row) {
+  assert(column <= fsm.count);
+  assert(row <= fsm.event_count);
   return fsm.items[column][row];
 }
 
@@ -80,6 +85,7 @@ void fsm_dump(fsm_t fsm) {
 }
 
 void fsm_free(fsm_t fsm) {
+  assert(fsm.items);
   for (size_t i = 0; i < fsm.count; ++i) {
     free(fsm.items[i]);
   }

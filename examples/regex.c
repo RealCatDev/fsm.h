@@ -9,77 +9,76 @@
 #define SET_BIT(n, b) n |= b
 #define CLEAR_BIT(n, b) n &= ~(b)
 
-bool regex_compile(fsm_t *fsm, const char *pattern) {
-  fsm_init(fsm, 127);
-  fsm_push_empty(fsm);
+typedef struct {
+  fsm_t fsm;
+  uint8_t flags;
+  fsm_state_t pass_state;
+} regex_t;
 
-  uint8_t flags = 0;
+void regex_init(regex_t *regex) {
+  fsm_init(&regex->fsm, 127);
+  fsm_push_empty(&regex->fsm);
+}
+
+void regex_free(regex_t regex) {
+  if (fsm_initialized(regex.fsm)) fsm_free(regex.fsm);
+}
+
+bool regex_compile(regex_t *regex, const char *pattern) {
   while (*pattern) {
     switch(*pattern) {
     case '?': {
-      if (!GET_BIT(flags, REGEX_SPECIAL_ALLOWED_BIT)) return false;
-      // fsm_set()
-      flags = 0;
-      SET_BIT(flags, REGEX_PASSTHROUGH_BIT);
+      if (!GET_BIT(regex->flags, REGEX_SPECIAL_ALLOWED_BIT)) return false;
+      regex->flags = 0;
+      SET_BIT(regex->flags, REGEX_PASSTHROUGH_BIT);
     } break;
     case '*': {
-      if (!GET_BIT(flags, REGEX_SPECIAL_ALLOWED_BIT)) return false;
-      fsm_state_t state = fsm->count-1;
-      for (fsm_event_t i = 32; i < 127; ++i) if (fsm_get(*fsm, state, i) != 0) fsm_set(fsm, state, i, state);
-      flags = 0;
-      SET_BIT(flags, REGEX_PASSTHROUGH_BIT);
+      if (!GET_BIT(regex->flags, REGEX_SPECIAL_ALLOWED_BIT)) return false;
+      fsm_state_t state = regex->fsm.count-1;
+      for (fsm_event_t i = 32; i < 127; ++i) if (fsm_get(regex->fsm, state, i) != 0) fsm_set(&regex->fsm, state, i, state);
+      regex->flags = 0;
+      SET_BIT(regex->flags, REGEX_PASSTHROUGH_BIT);
     } break;
     case '+': {
-      if (!GET_BIT(flags, REGEX_SPECIAL_ALLOWED_BIT)) return false;
-      fsm_state_t prev_state = fsm->count-1;
-      fsm_state_t new_state = fsm_push_empty(fsm);
-      for (fsm_event_t i = 32; i < 127; ++i) if (fsm_get(*fsm, prev_state, i) != 0) fsm_set(fsm, new_state, i, new_state);
-      flags = 0;
-      SET_BIT(flags, REGEX_PASSTHROUGH_BIT);
+      if (!GET_BIT(regex->flags, REGEX_SPECIAL_ALLOWED_BIT)) return false;
+      fsm_state_t prev_state = regex->fsm.count-1;
+      fsm_state_t new_state = fsm_push_empty(&regex->fsm);
+      for (fsm_event_t i = 32; i < 127; ++i) if (fsm_get(regex->fsm, prev_state, i) != 0) fsm_set(&regex->fsm, new_state, i, new_state);
+      regex->flags = 0;
+      SET_BIT(regex->flags, REGEX_PASSTHROUGH_BIT);
     } break;
     case '.': {
-      fsm_state_t state = fsm_push_empty(fsm);
-      for (fsm_event_t i = 32; i < 127; ++i) fsm_set(fsm, state, i, fsm->count);
-      flags = 0;
-      SET_BIT(flags, REGEX_ANY_BIT);
-      SET_BIT(flags, REGEX_SPECIAL_ALLOWED_BIT);
+      fsm_state_t state = fsm_push_empty(&regex->fsm);
+      for (fsm_event_t i = 32; i < 127; ++i) fsm_set(&regex->fsm, state, i, regex->fsm.count);
+      regex->flags = 0;
+      SET_BIT(regex->flags, REGEX_ANY_BIT);
+      SET_BIT(regex->flags, REGEX_SPECIAL_ALLOWED_BIT);
     } break;
     default: {
-      fsm_state_t state = fsm->count-1;
-      if (!GET_BIT(flags, REGEX_PASSTHROUGH_BIT)) state = fsm_push_empty(fsm);
-      fsm_set(fsm, state, *pattern, fsm->count);
-      flags = 0;
-      SET_BIT(flags, REGEX_SPECIAL_ALLOWED_BIT);
+      fsm_state_t state = regex->fsm.count-1;
+      if (!GET_BIT(regex->flags, REGEX_PASSTHROUGH_BIT)) state = fsm_push_empty(&regex->fsm);
+      fsm_set(&regex->fsm, state, *pattern, regex->fsm.count);
+      regex->flags = 0;
+      SET_BIT(regex->flags, REGEX_SPECIAL_ALLOWED_BIT);
     }
     }
 
     ++pattern;
   }
-  if (GET_BIT(flags, REGEX_PASSTHROUGH_BIT)) fsm_set(fsm, fsm->count-1, 0, fsm->count);
+  if (GET_BIT(regex->flags, REGEX_PASSTHROUGH_BIT)) fsm_set(&regex->fsm, regex->fsm.count-1, 0, regex->fsm.count);
 
   return true;
 }
 
-bool regex_match(fsm_t *fsm, const char *text) {
-  fsm->state = 1;
-  while (*text && fsm->state > 0 && fsm->state < fsm->count) (void)fsm_fire_event(fsm, *(text++));
+bool regex_match(regex_t *regex, const char *text) {
+  regex->fsm.state = 1;
+  while (*text && regex->fsm.state > 0 && regex->fsm.state < regex->fsm.count) (void)fsm_fire_event(&regex->fsm, *(text++));
 
-  if (fsm->state == 0 || *text) return false;
-  else if (fsm->state >= fsm->count) return true;
-  else (void)fsm_fire_event(fsm, 0);
+  if (regex->fsm.state == 0 || *text) return false;
+  else if (regex->fsm.state >= regex->fsm.count) return true;
+  else (void)fsm_fire_event(&regex->fsm, 0);
 
-  return fsm->state >= fsm->count;
-}
-
-bool match(const char *pattern, const char *text, fsm_t *fsm) {
-  if (fsm_initialized(*fsm)) fsm_free(*fsm);
-  memset(fsm, 0, sizeof(*fsm));
-  if (!regex_compile(fsm, pattern)) {
-    fprintf(stderr, "Failed to compile regex!\n");
-    return false;
-  }
-
-  return regex_match(fsm, text);
+  return regex->fsm.state >= regex->fsm.count;
 }
 
 int main(void) {
@@ -200,11 +199,18 @@ int main(void) {
   };
   size_t test_count = sizeof(tests)/sizeof(tests[0]);
 
-  fsm_t fsm = {0};
   for (size_t i = 0; i < test_count; ++i) {
     test_t test = tests[i];
-    bool actual = match(test.pattern, test.text, &fsm);
-    if (actual != test.expected) fsm_dump(fsm);
+
+    regex_t regex = {0};
+    regex_init(&regex);
+    if (!regex_compile(&regex, test.pattern)) {
+      fprintf(stderr, "Failed to compile pattern %s\n", test.pattern);
+      return 1;
+    }
+
+    bool actual = regex_match(&regex, test.text);
+    if (actual != test.expected) fsm_dump(regex.fsm);
     printf("(%zu/%zu): ", i+1, test_count);
     if (actual == test.expected) printf("Success!\n");
     else {
@@ -212,6 +218,8 @@ int main(void) {
       printf("Expected %d but got %d\n", test.expected, actual);
       return 1;
     }
+
+    regex_free(regex);
   }
 
   return 0;
