@@ -20,6 +20,7 @@ fsm_state_t fsm_push_empty(fsm_t *fsm);
 void fsm_set(fsm_t *fsm, fsm_state_t column, fsm_event_t row, fsm_state_t state);
 fsm_state_t fsm_get(fsm_t fsm, fsm_state_t column, fsm_event_t row);
 fsm_state_t fsm_fire_event(fsm_t *fsm, fsm_event_t event);
+void fsm_duplicate(fsm_t *fsm, fsm_state_t from);
 void fsm_dump(fsm_t fsm);
 void fsm_free(fsm_t fsm);
 
@@ -70,6 +71,12 @@ fsm_state_t fsm_get(fsm_t fsm, fsm_state_t column, fsm_event_t row) {
 fsm_state_t fsm_fire_event(fsm_t *fsm, fsm_event_t event) {
   assert(event <= fsm->event_count);
   return fsm->state = fsm->items[fsm->state][event];
+}
+
+void fsm_duplicate(fsm_t *fsm, fsm_state_t from) {
+  assert(from < fsm->count);
+  fsm_state_t new_state = fsm_push_empty(fsm);
+  for (fsm_event_t i = 0; i < fsm->event_count; ++i) fsm_set(fsm, new_state, i, fsm_get(*fsm, from, i));
 }
 
 void fsm_dump(fsm_t fsm) {
