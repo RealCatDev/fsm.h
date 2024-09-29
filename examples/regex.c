@@ -129,241 +129,267 @@ bool regex_match(regex_t *regex, const char *text) {
   return regex->fsm.state >= regex->fsm.count;
 }
 
-int main(void) {
-  typedef struct {
-    const char *pattern;
-    const char *text;
-    bool expected;
-  } test_t;
-  test_t tests[] = {
-    (test_t){
-      .pattern = "abc",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "abc",
-      .text = "ab",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "abc",
-      .text = "abd",
-      .expected = false
-    },
+int main(int argc, char **argv) {
+  if (argc == 2 && strcmp(argv[1], "match") == 0) {
+    printf("Pattern: ");
+    char pattern[128] = {0};
+    if (!fgets(pattern, 128, stdin)) return 1;
+    size_t pattern_len = strlen(pattern)-1;
+    pattern[pattern_len] = '\0';
 
-    (test_t){
-      .pattern = "abc?",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "abc?",
-      .text = "ab",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "abc?",
-      .text = "abcd",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "a?bc",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a?bc",
-      .text = "bc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "abc?d",
-      .text = "abcd",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "abc?d",
-      .text = "abd",
-      .expected = true
-    },
-
-    (test_t){
-      .pattern = "a*",
-      .text = "a",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a*",
-      .text = "aaaaa",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a*",
-      .text = "b",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "a*bc",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a*bc",
-      .text = "bbc",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "a*bc",
-      .text = "aaaaabc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a*bc",
-      .text = "aaaaac",
-      .expected = false
-    },
-
-    (test_t){
-      .pattern = "a+",
-      .text = "a",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a+",
-      .text = "aaaaa",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a+",
-      .text = "",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "a+",
-      .text = "ab",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "a+bc",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a+bc",
-      .text = "bc",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "a+bc",
-      .text = "aaaaabc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "a+bc",
-      .text = "aaaaac",
-      .expected = false
-    },
-
-    (test_t){
-      .pattern = "(a)bc",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(a)bc",
-      .text = "bbc",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "(a)bc",
-      .text = "bc",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "(a)*bc",
-      .text = "bc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(a)*bc",
-      .text = "aaaabc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(ab)+c",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(ab)+c",
-      .text = "abababc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(ab)+c",
-      .text = "ac",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "(ab)+c",
-      .text = "bc",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "(ab)*c",
-      .text = "c",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(ab)*c",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(ab)*c",
-      .text = "ac",
-      .expected = false
-    },
-    (test_t){
-      .pattern = "(ab)?c",
-      .text = "abc",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(ab)?c",
-      .text = "c",
-      .expected = true
-    },
-    (test_t){
-      .pattern = "(ab)?c",
-      .text = "ac",
-      .expected = false
-    },
-  };
-  size_t test_count = sizeof(tests)/sizeof(tests[0]);
-
-  for (size_t i = 0; i < test_count; ++i) {
-    test_t test = tests[i];
+    printf("Text to be matched: ");
+    char text[1024] = {0};
+    if (!fgets(text, 1024, stdin)) return 1;
+    size_t text_len = strlen(text)-1;
+    text[text_len] = '\0';
 
     regex_t regex = {0};
     regex_init(&regex);
-    if (!regex_compile(&regex, test.pattern)) {
-      fprintf(stderr, "Failed to compile pattern %s\n", test.pattern);
+    if (!regex_compile(&regex, pattern)) {
+      fprintf(stderr, "Failed to compile regex!\n");
       return 1;
     }
 
-    bool actual = regex_match(&regex, test.text);
-    if (actual != test.expected) fsm_dump(regex.fsm);
-    printf("(%zu/%zu): ", i+1, test_count);
-    if (actual == test.expected) printf("Success!\n");
-    else {
-      printf("Failed!\n");
-      printf("Expected %d but got %d\n", test.expected, actual);
-      return 1;
-    }
+    printf("\"%s\" does", text);
+    if (!regex_match(&regex, text)) printf("n't");
+    printf(" match \"%s\"\n", pattern);
+    return 0;
+  } else {
+    typedef struct {
+      const char *pattern;
+      const char *text;
+      bool expected;
+    } test_t;
+    test_t tests[] = {
+      (test_t){
+        .pattern = "abc",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "abc",
+        .text = "ab",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "abc",
+        .text = "abd",
+        .expected = false
+      },
 
-    regex_free(regex);
+      (test_t){
+        .pattern = "abc?",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "abc?",
+        .text = "ab",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "abc?",
+        .text = "abcd",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "a?bc",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a?bc",
+        .text = "bc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "abc?d",
+        .text = "abcd",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "abc?d",
+        .text = "abd",
+        .expected = true
+      },
+
+      (test_t){
+        .pattern = "a*",
+        .text = "a",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a*",
+        .text = "aaaaa",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a*",
+        .text = "b",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "a*bc",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a*bc",
+        .text = "bbc",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "a*bc",
+        .text = "aaaaabc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a*bc",
+        .text = "aaaaac",
+        .expected = false
+      },
+
+      (test_t){
+        .pattern = "a+",
+        .text = "a",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a+",
+        .text = "aaaaa",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a+",
+        .text = "",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "a+",
+        .text = "ab",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "a+bc",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a+bc",
+        .text = "bc",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "a+bc",
+        .text = "aaaaabc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "a+bc",
+        .text = "aaaaac",
+        .expected = false
+      },
+
+      (test_t){
+        .pattern = "(a)bc",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(a)bc",
+        .text = "bbc",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "(a)bc",
+        .text = "bc",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "(a)*bc",
+        .text = "bc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(a)*bc",
+        .text = "aaaabc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(ab)+c",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(ab)+c",
+        .text = "abababc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(ab)+c",
+        .text = "ac",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "(ab)+c",
+        .text = "bc",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "(ab)*c",
+        .text = "c",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(ab)*c",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(ab)*c",
+        .text = "ac",
+        .expected = false
+      },
+      (test_t){
+        .pattern = "(ab)?c",
+        .text = "abc",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(ab)?c",
+        .text = "c",
+        .expected = true
+      },
+      (test_t){
+        .pattern = "(ab)?c",
+        .text = "ac",
+        .expected = false
+      },
+    };
+    size_t test_count = sizeof(tests)/sizeof(tests[0]);
+
+    for (size_t i = 0; i < test_count; ++i) {
+      test_t test = tests[i];
+
+      regex_t regex = {0};
+      regex_init(&regex);
+      if (!regex_compile(&regex, test.pattern)) {
+        fprintf(stderr, "Failed to compile pattern %s\n", test.pattern);
+        return 1;
+      }
+
+      bool actual = regex_match(&regex, test.text);
+      if (actual != test.expected) fsm_dump(regex.fsm);
+      printf("(%zu/%zu): ", i+1, test_count);
+      if (actual == test.expected) printf("Success!\n");
+      else {
+        printf("Failed!\n");
+        printf("Expected %d but got %d\n", test.expected, actual);
+        return 1;
+      }
+
+      regex_free(regex);
+    }
   }
 
   return 0;
