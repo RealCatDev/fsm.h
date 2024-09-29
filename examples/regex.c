@@ -28,6 +28,20 @@ void regex_free(regex_t regex) {
 
 bool regex_compile_bracket(regex_t *regex, const char *pattern, const char **end);
 bool regex_compile_expr(regex_t *regex, const char *pattern, const char **end) {
+  if (*pattern == '\\') {
+    ++pattern;
+    fsm_state_t state = regex->prev_state;
+    if (GET_BIT(regex->flags, REGEX_QMARK_BIT)) {
+      fsm_set(&regex->fsm, state, *pattern, regex->fsm.count+1);
+      state = fsm_push_empty(&regex->fsm);
+    } else if (!GET_BIT(regex->flags, REGEX_PASSTHROUGH_BIT)) state = fsm_push_empty(&regex->fsm);
+    fsm_set(&regex->fsm, state, *pattern, regex->fsm.count);
+    regex->flags = 0;
+    SET_BIT(regex->flags, REGEX_SPECIAL_ALLOWED_BIT);
+    regex->prev_state = state;
+    *end = ++pattern;
+    return true;
+  }
   switch(*pattern) {
   case '?': {
     if (!GET_BIT(regex->flags, REGEX_SPECIAL_ALLOWED_BIT)) return false;
